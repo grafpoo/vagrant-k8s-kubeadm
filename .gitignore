@@ -1,4 +1,1 @@
-.vagrant
-*.log
-kube.config
-kubeadm-join.sh
+**/certs/

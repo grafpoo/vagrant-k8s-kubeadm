@@ -34,84 +34,61 @@ import sys
 import subprocess
 
 domain = sys.argv[1]
-keyfile_name = f"/vagrant/certs/{domain}.key"
-csrfile_name = f"/vagrant/certs/{domain}.csr"
-extfile_name = f"/vagrant/certs/{domain}.ext"
-crtfile_name = f"/vagrant/certs/{domain}.crt"
 
-# generate key
+ca_keyfile_name = f"/vagrant/certs/{domain}CA.key"
+ca_pemfile_name = f"/vagrant/certs/{domain}CA.pem"
 
-os.system(f"openssl genrsa -out {keyfile_name} 2048")
-#subprocess.call(["openssl", "genrsa", "-out", keyfile_name, "2048"])
-subprocess.call(["ls", keyfile_name])
+ca_password = sys.argv.count > 1 ? sys.argv[1] : "password"
 
-# generate csr
+for host in ["harbor", "gitlab"]:
+    keyfile_name = f"/vagrant/certs/{domain}_{host}.key"
+    csrfile_name = f"/vagrant/certs/{domain}_{host}.csr"
+    extfile_name = f"/vagrant/certs/{domain}_{host}.ext"
+    crtfile_name = f"/vagrant/certs/{domain}_{host}.crt"
 
-csr_command = f"openssl req -new -key {keyfile_name} -out {csrfile_name}"
-subprocess.call(["echo", csr_command])
-child = pexpect.spawn(csr_command)
+    # generate key
 
-child.expect('Country.*\]:', timeout=5)
-child.sendline('US')
-child.expect('State.*\]:')
-child.sendline('')
-child.expect('Locality.*\]:')
-child.sendline('')
-child.expect('Organization.*\]:')
-child.sendline('')
-child.expect('Organizational.*\]:')
-child.sendline('')
-child.expect('Common.*\]:')
-child.sendline(domain)
-child.expect('Email.*\]:')
-child.sendline('')
-child.expect('A challenge password.*\]:', timeout=5)
-child.sendline('')
-child.expect('An optional company name.*\]:', timeout=5)
-child.sendline('')
+    os.system(f"openssl genrsa -out {keyfile_name} 2048")
+    #subprocess.call(["openssl", "genrsa", "-out", keyfile_name, "2048"])
+    subprocess.call(["ls", keyfile_name])
 
-# generate ext
+    # generate csr
 
-fext = open(extfile_name, "w")
-fext.write("authorityKeyIdentifier=keyid,issuer\n")
-fext.write("basicConstraints=CA:FALSE\n")
-fext.write("keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment\n")
-fext.write("subjectAltName = @alt_names\n")
-fext.write("[alt_names]\n")
-fext.write(f"DNS.1 = {domain}\n")
-fext.close()
+    csr_command = f"openssl req -new -key {keyfile_name} -out {csrfile_name}"
+    subprocess.call(["echo", csr_command])
+    child = pexpect.spawn(csr_command)
 
-# generate certificate
+    child.expect('Country.*\]:', timeout=5)
+    child.sendline('US')
+    child.expect('State.*\]:')
+    child.sendline('')
+    child.expect('Locality.*\]:')
+    child.sendline('')
+    child.expect('Organization.*\]:')
+    child.sendline('')
+    child.expect('Organizational.*\]:')
+    child.sendline('')
+    child.expect('Common.*\]:')
+    child.sendline(domain)
+    child.expect('Email.*\]:')
+    child.sendline('')
+    child.expect('A challenge password.*\]:', timeout=5)
+    child.sendline('')
+    child.expect('An optional company name.*\]:', timeout=5)
+    child.sendline('')
 
-os.system(f"openssl x509 -req -in {csrfile_name} -CA /vagrant/ca/k8sCA.pem -CAkey /vagrant/ca/k8sCA.key -CAcreateserial -out {crtfile_name} -days 825 -sha256 -extfile {extfile_name}")
+    # generate ext
 
-'''
+    fext = open(extfile_name, "w")
+    fext.write("authorityKeyIdentifier=keyid,issuer\n")
+    fext.write("basicConstraints=CA:FALSE\n")
+    fext.write("keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment\n")
+    fext.write("subjectAltName = @alt_names\n")
+    fext.write("[alt_names]\n")
+    fext.write(f"DNS.1 = {domain}\n")
+    fext.close()
 
-DOMAIN=$1
+    # generate certificate
 
-cd ~/certs
+    os.system(f"openssl x509 -req -in {csrfile_name} -CA /vagrant/ca/k8sCA.pem -CAkey /vagrant/ca/k8sCA.key -CAcreateserial -out {crtfile_name} -days 825 -sha256 -extfile {extfile_name}")
 
-openssl genrsa -out $DOMAIN.key 2048
-openssl req -new -key $DOMAIN.key -out $DOMAIN.csr<<EOF
-US
-maryland
-baltimore
-home
-basement
-k8scert
-nobody@example.com
-EOF
-
-cat > $DOMAIN.ext << EOF
-authorityKeyIdentifier=keyid,issuer
-basicConstraints=CA:FALSE
-keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
-subjectAltName = @alt_names
-[alt_names]
-DNS.1 = $DOMAIN
-EOF
-
-openssl x509 -req -in $DOMAIN.csr -CA ./ca/k8sCA.pem -CAkey ./ca/k8sCA.key -CAcreateserial \
--out $DOMAIN.crt -days 825 -sha256 -extfile $DOMAIN.ext
-
-'''
