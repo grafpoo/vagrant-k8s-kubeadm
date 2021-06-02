@@ -1,0 +1,119 @@
+#!/usr/bin/env python
+
+'''This demonstrates an FTP "bookmark". This connects to an ftp site; does a
+few ftp stuff; and then gives the user interactive control over the session. In
+this case the "bookmark" is to a directory on the OpenBSD ftp server. It puts
+you in the i386 packages directory. You can easily modify this for other sites.
+
+PEXPECT LICENSE
+
+    This license is approved by the OSI and FSF as GPL-compatible.
+        http://opensource.org/licenses/isc-license.txt
+
+    Copyright (c) 2012, Noah Spurrier <noah@noah.org>
+    PERMISSION TO USE, COPY, MODIFY, AND/OR DISTRIBUTE THIS SOFTWARE FOR ANY
+    PURPOSE WITH OR WITHOUT FEE IS HEREBY GRANTED, PROVIDED THAT THE ABOVE
+    COPYRIGHT NOTICE AND THIS PERMISSION NOTICE APPEAR IN ALL COPIES.
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+'''
+
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
+
+import pexpect
+import os
+import sys
+import subprocess
+import time
+
+domain = sys.argv[1]
+keyfile_name = f"/vagrant/certs/{domain}.key"
+csrfile_name = f"/vagrant/certs/{domain}.csr"
+
+#os.system(f"openssl genrsa -out {keyfile_name} 2048")
+#subprocess.call(["openssl", "genrsa", "-out", keyfile_name, "2048"])
+subprocess.call(["ls", keyfile_name])
+subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+
+csr_command = f"openssl req -new -key {keyfile_name} -out {csrfile_name}"
+subprocess.call(["echo", csr_command])
+child = pexpect.spawn(csr_command)
+
+child.expect('Country.*\]:', timeout=5)
+child.sendline('US')
+subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+child.expect('State.*\]:')
+child.sendline('')
+subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+child.expect('Locality.*\]:')
+child.sendline('')
+subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+child.expect('Organization.*\]:')
+child.sendline('')
+subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+child.expect('Organizational.*\]:')
+child.sendline('')
+subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+child.expect('Common.*\]:')
+child.sendline(domain)
+subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+child.expect('Email.*\]:')
+child.sendline('')
+subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+child.expect('A challenge password.*\]:', timeout=5)
+child.sendline('')
+#subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+child.expect('An optional company name.*\]:', timeout=5)
+child.sendline('')
+#subprocess.call(["echo", "XXXXXXXXXXXXXXXXXXXXXXXXX"])
+#time.sleep(1)
+#child.close()
+
+
+'''
+
+Country Name (2 letter code) []:
+State or Province Name (full name) []:
+Locality Name (eg, city) []:
+Organization Name (eg, company) []:
+Organizational Unit Name (eg, section) []:
+Common Name (eg, fully qualified host name) []:
+Email Address []:
+
+
+DOMAIN=$1
+
+cd ~/certs
+
+openssl genrsa -out $DOMAIN.key 2048
+openssl req -new -key $DOMAIN.key -out $DOMAIN.csr<<EOF
+US
+maryland
+baltimore
+home
+basement
+k8scert
+nobody@example.com
+EOF
+
+cat > $DOMAIN.ext << EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = $DOMAIN
+EOF
+
+openssl x509 -req -in $DOMAIN.csr -CA ./ca/k8sCA.pem -CAkey ./ca/k8sCA.key -CAcreateserial \
+-out $DOMAIN.crt -days 825 -sha256 -extfile $DOMAIN.ext
+
+'''
